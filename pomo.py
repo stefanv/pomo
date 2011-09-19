@@ -24,12 +24,50 @@ except ImportError:
     has_pynotify = False
 
 try:
+    import appindicator
+    has_appindicator = True
+except ImportError:
+    has_appindicator = False
+    
+try:
     import gtk
     import gobject
-    import appindicator
     has_gtk = True
 except:
     has_gtk = False
+
+if has_gtk:
+    class GTKIndicator(object):
+        """Inspired by
+        http://askubuntu.com/questions/13197/how-to-program-a-status-icon-that-will-display-in-ubuntu-11-04-as-well-as-in-othe/13206#13206
+
+        and code released by George Edison under an MIT License.
+        """
+        def __init__(self, name, icon, status):
+            self.icon = gtk.StatusIcon()
+            self.icon.set_from_file(
+                os.path.join(os.path.dirname(__file__), './icons',
+                             icon + '.png')
+                )
+
+        def set_menu(self, menu):
+            self.menu = menu
+            self.icon.connect("activate", self.show_menu)
+
+        def show_menu(self, widget):
+            self.menu.popup(None, None, None, 0, 0)
+
+        def set_status(self, status):
+            pass
+
+        def set_attention_icon(self, icon):
+            pass
+
+
+if has_appindicator and has_gtk:
+    Indicator = appindicator.Indicator
+elif has_gtk:
+    Indicator = GTKIndicator
 
 def notify(title, message):
     global has_pynotify
@@ -142,8 +180,8 @@ class PomoApplet:
         self.task = task
 
     def run(self):
-        ind = appindicator.Indicator("pomo", "pomo-applet-active",
-                                     appindicator.CATEGORY_APPLICATION_STATUS)
+        ind = Indicator("pomo", "pomo-applet-active",
+                        appindicator.CATEGORY_APPLICATION_STATUS)
         ind.set_status(appindicator.STATUS_ACTIVE)
         ind.set_attention_icon("indicator-messages-new")
 
