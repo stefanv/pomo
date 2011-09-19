@@ -2,17 +2,10 @@
 
 from __future__ import division
 
-TASK_DURATION = 25
+TASK_DURATION = 0.3
 
-import argparse
-import time
-import json
-import os
-import warnings
-import itertools
-import collections
-import datetime
-import sys
+import argparse, time, os, warnings, itertools, collections, \
+       datetime, sys, threading, multiprocessing
 
 parser = argparse.ArgumentParser(description='Pomodoro timer')
 parser.add_argument('-t', '--task', type=str,
@@ -26,6 +19,14 @@ try:
     has_pynotify = True
 except ImportError:
     has_pynotify = False
+
+try:
+    import gtk
+    import gobject
+    import appindicator
+    has_gtk = True
+except:
+    has_gtk = False
 
 def notify(title, message):
     global has_pynotify
@@ -47,10 +48,10 @@ def notify(title, message):
         print "*" * 50 + "\n\n"
 
 def get_time():
-    return time.strftime('%Y/%m/%d %H:%M')
+    return time.strftime('%Y/%m/%d %H:%M:%S')
 
 def load_time(s):
-    return datetime.datetime.strptime(s, '%Y/%m/%d %H:%M')
+    return datetime.datetime.strptime(s, '%Y/%m/%d %H:%M:%S')
 
 def group(lst, n):
     """group([0,3,4,10,2,3], 2) => iterator
@@ -130,11 +131,65 @@ if args.analyse is not None:
 
     sys.exit(0)
 
+class PomoApplet:
+    time = '00:00'
 
-time0 = get_time()
+    def __init__(self, queue, task=""):
+        self.queue = queue
+        self.task = task
+
+    def run(self):
+        ind = appindicator.Indicator("pomo", "pomo-applet-active",
+                                     appindicator.CATEGORY_APPLICATION_STATUS)
+        ind.set_status(appindicator.STATUS_ACTIVE)
+        ind.set_attention_icon("indicator-messages-new")
+
+        time_menu = gtk.MenuItem("test")
+        task_menu = gtk.MenuItem(self.task)
+
+        menu = gtk.Menu()
+        for m in (time_menu, task_menu):
+            menu.append(m)
+            m.show()
+
+        ind.set_menu(menu)
+
+        self._ind = ind
+        self._menu = menu
+        self._time_menu = time_menu
+
+        gobject.timeout_add(1000, self.timeout_callback)
+
+        gtk.main()
+
+    def timeout_callback(self):
+        self._time_menu.set_label(self.queue.get())
+        return True
+
+    def set_time(self, t):
+        self.time = t
+
+def build_applet(queue, task):
+    applet = PomoApplet(queue, task)
+    applet.run()
+
+queue = multiprocessing.Queue()
+applet_process = None
+if has_gtk:
+    applet_process = multiprocessing.Process(target=build_applet,
+                                             args=(queue, args.task))
+    applet_process.start()
+
 notify('Your 25 minutes starts now',
        'Working on: %s' % args.task)
-time.sleep(TASK_DURATION * 60)
+
+time0 = get_time()
+
+for i in range(int(TASK_DURATION * 60), 0, -1):
+    timer = queue.put(str(datetime.timedelta(seconds=i)))
+    print str(i)
+    time.sleep(1)
+
 time1 = get_time()
 
 notify("Time's up!",
@@ -150,4 +205,7 @@ try:
                       time1,
                       ""))
 except IOError:
-    config = {}
+    print 'Could not write to log file %s.' % log_file
+
+if applet_process is not None:
+    applet_process.terminate()
