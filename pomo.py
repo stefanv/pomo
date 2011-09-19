@@ -26,9 +26,13 @@ except ImportError:
 try:
     import appindicator
     has_appindicator = True
+    app_type = appindicator.CATEGORY_APPLICATION_STATUS
+    app_status_active = appindicator.STATUS_ACTIVE
 except ImportError:
     has_appindicator = False
-    
+    app_type = None
+    app_status_active = True
+
 try:
     import gtk
     import gobject
@@ -180,9 +184,8 @@ class PomoApplet:
         self.task = task
 
     def run(self):
-        ind = Indicator("pomo", "pomo-applet-active",
-                        appindicator.CATEGORY_APPLICATION_STATUS)
-        ind.set_status(appindicator.STATUS_ACTIVE)
+        ind = Indicator("pomo", "pomo-applet-active", app_type)
+        ind.set_status(app_status_active)
         ind.set_attention_icon("indicator-messages-new")
 
         time_menu = gtk.MenuItem("test")
