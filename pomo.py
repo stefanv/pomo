@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Author: Stéfan van der Walt <stefan@sun.ac.za>
+# Author: Stefan van der Walt <stefan@sun.ac.za>
 # License: BSD
 
 from __future__ import division
