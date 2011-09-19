@@ -2,7 +2,7 @@
 
 from __future__ import division
 
-TASK_DURATION = 0.3
+TASK_DURATION = 25
 
 import argparse, time, os, warnings, itertools, collections, \
        datetime, sys, threading, multiprocessing
@@ -187,7 +187,6 @@ time0 = get_time()
 
 for i in range(int(TASK_DURATION * 60), 0, -1):
     timer = queue.put(str(datetime.timedelta(seconds=i)))
-    print str(i)
     time.sleep(1)
 
 time1 = get_time()
