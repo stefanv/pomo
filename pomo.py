@@ -1,4 +1,8 @@
+#!/usr/bin/env python
+
 from __future__ import division
+
+TASK_DURATION = 25
 
 import argparse
 import time
@@ -19,18 +23,28 @@ args = parser.parse_args()
 
 try:
     import pynotify
-    notify = True
+    has_pynotify = True
 except ImportError:
-    notify = False
+    has_pynotify = False
 
 def notify(title, message):
-    if not notify or not pynotify.init("icon-summary-body"):
+    global has_pynotify
+
+    if has_pynotify:
+        if not pynotify.init("icon-summary-body"):
+            has_pynotify = False
+
+        n = pynotify.Notification(title, message)
+        n.set_urgency(pynotify.URGENCY_CRITICAL)
+
+        if not n.show():
+            has_pynotify = False
+
+    if not has_pynotify:
         print "\n\n" + "*" * 50
         print title
         print message
-        print "\n\n" + "*" * 50
-    else:
-        n = pynotify.Notification(title, message)
+        print "*" * 50 + "\n\n"
 
 def get_time():
     return time.strftime('%Y/%m/%d %H:%M')
@@ -89,6 +103,7 @@ def report(data):
 
     total = datetime.timedelta()
     longest_time = datetime.timedelta()
+    longest_name = 'No task longer than 0 minutes'
     for name, task in pomos.items():
         duration = task['time']
         total += task['time']
@@ -117,8 +132,13 @@ if args.analyse is not None:
 
 
 time0 = get_time()
-
+notify('Your 25 minutes starts now',
+       'Working on: %s' % args.task)
+time.sleep(TASK_DURATION * 60)
 time1 = get_time()
+
+notify("Time's up!",
+       'Take a 5 minute break...')
 
 log_file = os.path.join(os.path.dirname(__file__), 'pomo.log')
 
