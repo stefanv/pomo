@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# Author: Stéfan van der Walt <stefan@sun.ac.za>
+# License: BSD
+
 from __future__ import division
 
 TASK_DURATION = 25
