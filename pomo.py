@@ -252,7 +252,7 @@ notify('Your 25 minutes starts now',
 
 time0 = get_time()
 
-for i in range(int(TASK_DURATION * 60), 0, -1):
+for i in range(int(TASK_DURATION * 60) - 1, 0, -1):
     timer = queue.put(str(datetime.timedelta(seconds=i)))
     time.sleep(1)
 
