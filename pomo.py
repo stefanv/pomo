@@ -73,7 +73,7 @@ if has_appindicator and has_gtk:
 elif has_gtk:
     Indicator = GTKIndicator
 
-def notify(title, message):
+def notify(title, message, sound=False):
     global has_pynotify
 
     if has_pynotify:
@@ -91,6 +91,13 @@ def notify(title, message):
         print title
         print message
         print "*" * 50 + "\n\n"
+
+    if sound:
+        import subprocess
+        try:
+            subprocess.call(['/usr/bin/canberra-gtk-play', '--id', 'message'])
+        except OSError:
+            pass
 
 def get_time():
     return time.strftime('%Y/%m/%d %H:%M:%S')
@@ -252,7 +259,8 @@ for i in range(int(TASK_DURATION * 60), 0, -1):
 time1 = get_time()
 
 notify("Time's up!",
-       'Take a 5 minute break...')
+       'Take a 5 minute break...',
+       sound=True)
 
 log_file = os.path.join(os.path.dirname(__file__), 'pomo.log')
 
