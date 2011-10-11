@@ -124,6 +124,8 @@ def report(data):
         print 'Trying to proceed anyway.'
         data = data[:L - (L % 3)]
 
+    today = datetime.datetime.today().date()
+
     pomos = collections.OrderedDict()
     total_today = datetime.timedelta()
     for (task, start, end) in group(data, 3):
@@ -132,13 +134,14 @@ def report(data):
         
         if task not in pomos:
             pomos[task] = {'nr': 0,
-                           'time': datetime.timedelta()}
+                           'time': datetime.timedelta(),
+                           'date': end.date()}
 
         pomos[task]['nr'] += 1
         delta = (end - start)
         pomos[task]['time'] += delta
 
-        if end.date() == datetime.datetime.today().date():
+        if end.date() == today:
             total_today += delta
 
     print "Task summary [pomos]"
@@ -158,7 +161,20 @@ def report(data):
             longest_time = duration
             longest_name = name
 
-    print "Time summary"
+    print "Last 5 days"
+    print "-----------"
+    day_work = {}
+    for name, task in pomos.items():
+        days_ago = (today - task['date']).days
+        if days_ago <= 5:
+            day_work[days_ago] = day_work.get(days_ago, 0) + 1
+
+    for i in range(5, 0, -1):
+        if i in day_work:
+            print today - datetime.timedelta(days=i), "[%s]" % day_work[i]
+        
+
+    print "\nTime summary"
     print "------------"
     print "Total time for today:", total_today
     print "Total time:", total
