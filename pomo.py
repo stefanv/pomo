@@ -17,6 +17,12 @@ parser.add_argument('-a', '--analyse', type=str,
                     help='analyse the given pomo log')
 args = parser.parse_args()
 
+if args.task is None and args.analyse is None:
+    parser.print_help()
+    print "\nEither specify a task, or analyse a log file."
+    sys.exit(-1)
+    
+
 try:
     import pynotify
     has_pynotify = True
