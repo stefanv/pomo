@@ -34,10 +34,12 @@ try:
     has_appindicator = True
     app_type = appindicator.CATEGORY_APPLICATION_STATUS
     app_status_active = appindicator.STATUS_ACTIVE
+    app_status_attention = appindicator.STATUS_ATTENTION
 except ImportError:
     has_appindicator = False
     app_type = None
-    app_status_active = True
+    app_status_active = 1
+    app_status_attention = 2
 
 try:
     import gtk
@@ -234,7 +236,7 @@ class PomoApplet(TimeConsumer):
     def run(self):
         ind = Indicator("pomo", "pomo-applet-active", app_type)
         ind.set_status(app_status_active)
-        ind.set_attention_icon("indicator-messages-new")
+        ind.set_attention_icon("pomo-applet-active")
 
         time_menu = gtk.MenuItem("test")
         task_menu = gtk.MenuItem('Task: ' + self.task)
@@ -295,7 +297,7 @@ class PomoApplet(TimeConsumer):
 time_queue = multiprocessing.Queue()
 msg_queue = multiprocessing.Queue()
 
-for i in range(int(TASK_DURATION * 60) - 1, 0, -1):
+for i in range(int(TASK_DURATION * 60) - 1, -1, -1):
      time_queue.put(str(datetime.timedelta(seconds=i)))
 
 if has_gtk:
