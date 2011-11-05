@@ -46,6 +46,7 @@ try:
 except:
     has_gtk = False
 
+
 if has_gtk:
     class GTKIndicator(object):
         """Inspired by
@@ -205,12 +206,30 @@ if args.analyse is not None:
 
     sys.exit(0)
 
-class PomoApplet:
-    def __init__(self, time_queue, msg_queue, task=""):
+class TimeConsumer(multiprocessing.Process):
+    def __init__(self, time_queue, msg_queue):
+        multiprocessing.Process.__init__(self)
         self.time_queue = time_queue
         self.msg_queue = msg_queue
+
+    def run(self):
+        while 1:
+            try:
+                task = self.time_queue.get_nowait()
+                sys.stdout.write('Time left: ' + task + '\r')
+                sys.stdout.flush()
+                time.sleep(1)
+            except Queue.Empty:
+                break
+        print
+
+
+class PomoApplet(TimeConsumer):
+    def __init__(self, time_queue, msg_queue, task=""):
+        TimeConsumer.__init__(self, time_queue, msg_queue)
         self.task = task
         self.time = '00:00'
+        self._pause = False
 
     def run(self):
         ind = Indicator("pomo", "pomo-applet-active", app_type)
@@ -219,13 +238,19 @@ class PomoApplet:
 
         time_menu = gtk.MenuItem("test")
         task_menu = gtk.MenuItem('Task: ' + self.task)
-        separator = gtk.SeparatorMenuItem()
         quit_menu = gtk.MenuItem('Squish')
+        pause_menu = gtk.MenuItem('Pause/Unpause')
 
         quit_menu.connect("activate", self.squish)
+        pause_menu.connect("activate", self.pause)
 
         menu = gtk.Menu()
-        for m in (time_menu, task_menu, separator, quit_menu):
+        for m in (time_menu,
+                  task_menu,
+                  gtk.SeparatorMenuItem(),
+                  quit_menu,
+                  gtk.SeparatorMenuItem(),
+                  pause_menu):
             menu.append(m)
             m.show()
 
@@ -242,7 +267,14 @@ class PomoApplet:
         gtk.main()
 
     def timeout_callback(self,):
-        self.time = self.time_queue.get()
+        if self._pause:
+            return True
+
+        try:
+            self.time = self.time_queue.get_nowait()
+        except Queue.Empty:
+            self.abort()
+
         self.update_label()
         return True
 
@@ -251,18 +283,27 @@ class PomoApplet:
 
     def squish(self, menu=None):
         self.msg_queue.put('ABORT')
+        self.abort()
+
+    def pause(self, menu=None):
+        self._pause = not self._pause
+
+    def abort(self):
         gtk.main_quit()
+
 
 time_queue = multiprocessing.Queue()
 msg_queue = multiprocessing.Queue()
 
-applet_process = None
+for i in range(int(TASK_DURATION * 60) - 1, 0, -1):
+     time_queue.put(str(datetime.timedelta(seconds=i)))
+
 if has_gtk:
-    applet = PomoApplet(time_queue, msg_queue, args.task)
-    applet_process = multiprocessing.Process(target=applet.run)
+    applet_process = PomoApplet(time_queue, msg_queue, args.task)
     applet_process.start()
 else:
-    applet = None
+    applet_process = TimeConsumer(time_queue, msg_queue)
+    applet_process.start()
 
 def terminate():
     if applet_process is not None:
@@ -274,21 +315,18 @@ notify('Your 25 minutes starts now',
 
 time0 = get_time()
 
-for i in range(int(TASK_DURATION * 60) - 1, 0, -1):
-    timer = time_queue.put(str(datetime.timedelta(seconds=i)))
-
-    # See if abort button was clicked in applet
+while applet_process.is_alive() or not msg_queue.empty():
     try:
         msg = msg_queue.get_nowait()
-        if msg == 'ABORT':
-            notify("Squish!",
-                   'Tomato recycled...')
-            terminate()
-
     except Queue.Empty:
-        pass
+        time.sleep(0.1)
+        msg = None
+
+    if msg == 'ABORT':
+        notify("Squish!",
+               'Tomato recycled...')
+        terminate()
     
-    time.sleep(1)
 
 time1 = get_time()
 
