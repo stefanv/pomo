@@ -8,7 +8,7 @@ from __future__ import division
 TASK_DURATION = 25
 
 import argparse, time, os, warnings, itertools, collections, \
-       datetime, sys, threading, multiprocessing
+       datetime, sys, threading, multiprocessing, Queue
 
 parser = argparse.ArgumentParser(description='Pomodoro timer')
 parser.add_argument('-t', '--task', type=str,
@@ -206,11 +206,11 @@ if args.analyse is not None:
     sys.exit(0)
 
 class PomoApplet:
-    time = '00:00'
-
-    def __init__(self, queue, task=""):
-        self.queue = queue
+    def __init__(self, time_queue, msg_queue, task=""):
+        self.time_queue = time_queue
+        self.msg_queue = msg_queue
         self.task = task
+        self.time = '00:00'
 
     def run(self):
         ind = Indicator("pomo", "pomo-applet-active", app_type)
@@ -218,10 +218,14 @@ class PomoApplet:
         ind.set_attention_icon("indicator-messages-new")
 
         time_menu = gtk.MenuItem("test")
-        task_menu = gtk.MenuItem(self.task)
+        task_menu = gtk.MenuItem('Task: ' + self.task)
+        separator = gtk.SeparatorMenuItem()
+        quit_menu = gtk.MenuItem('Squish')
+
+        quit_menu.connect("activate", self.squish)
 
         menu = gtk.Menu()
-        for m in (time_menu, task_menu):
+        for m in (time_menu, task_menu, separator, quit_menu):
             menu.append(m)
             m.show()
 
@@ -231,27 +235,39 @@ class PomoApplet:
         self._menu = menu
         self._time_menu = time_menu
 
+        self.update_label()
+
         gobject.timeout_add(1000, self.timeout_callback)
 
         gtk.main()
 
-    def timeout_callback(self):
-        self._time_menu.set_label(self.queue.get())
+    def timeout_callback(self,):
+        self.time = self.time_queue.get()
+        self.update_label()
         return True
 
-    def set_time(self, t):
-        self.time = t
+    def update_label(self):
+        self._time_menu.set_label(self.time)
 
-def build_applet(queue, task):
-    applet = PomoApplet(queue, task)
-    applet.run()
+    def squish(self, menu=None):
+        self.msg_queue.put('ABORT')
+        gtk.main_quit()
 
-queue = multiprocessing.Queue()
+time_queue = multiprocessing.Queue()
+msg_queue = multiprocessing.Queue()
+
 applet_process = None
 if has_gtk:
-    applet_process = multiprocessing.Process(target=build_applet,
-                                             args=(queue, args.task))
+    applet = PomoApplet(time_queue, msg_queue, args.task)
+    applet_process = multiprocessing.Process(target=applet.run)
     applet_process.start()
+else:
+    applet = None
+
+def terminate():
+    if applet_process is not None:
+        applet_process.terminate()
+        sys.exit(0)
 
 notify('Your 25 minutes starts now',
        'Working on: %s' % args.task)
@@ -259,7 +275,19 @@ notify('Your 25 minutes starts now',
 time0 = get_time()
 
 for i in range(int(TASK_DURATION * 60) - 1, 0, -1):
-    timer = queue.put(str(datetime.timedelta(seconds=i)))
+    timer = time_queue.put(str(datetime.timedelta(seconds=i)))
+
+    # See if abort button was clicked in applet
+    try:
+        msg = msg_queue.get_nowait()
+        if msg == 'ABORT':
+            notify("Squish!",
+                   'Tomato recycled...')
+            terminate()
+
+    except Queue.Empty:
+        pass
+    
     time.sleep(1)
 
 time1 = get_time()
@@ -280,5 +308,4 @@ try:
 except IOError:
     print 'Could not write to log file %s.' % log_file
 
-if applet_process is not None:
-    applet_process.terminate()
+terminate()
