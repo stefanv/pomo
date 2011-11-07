@@ -336,16 +336,20 @@ notify("Time's up!",
        'Take a 5 minute break...',
        sound=True)
 
-log_file = os.path.join(os.path.dirname(__file__), 'pomo.log')
+if time_queue.empty():
+    log_file = os.path.join(os.path.dirname(__file__), 'pomo.log')
 
-try:
-    with open(log_file, 'a') as f:
-        f.writelines(l + "\n" for l in
-                     (args.task or "Pomodoro",
-                      time0,
-                      time1,
-                      ""))
-except IOError:
-    print 'Could not write to log file %s.' % log_file
+    try:
+        with open(log_file, 'a') as f:
+            f.writelines(l + "\n" for l in
+                         (args.task or "Pomodoro",
+                          time0,
+                          time1,
+                          ""))
+    except IOError:
+        print 'Could not write to log file %s.' % log_file
+
+else:
+    print "Pomodoro incomplete... not writing to log."
 
 terminate()
