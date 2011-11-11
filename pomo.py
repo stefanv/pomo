@@ -8,7 +8,7 @@ from __future__ import division
 TASK_DURATION = 25
 
 import argparse, time, os, warnings, itertools, collections, \
-       datetime, sys, threading, multiprocessing, Queue
+       datetime, sys, threading, multiprocessing, Queue, copy
 
 parser = argparse.ArgumentParser(description='Pomodoro timer')
 parser.add_argument('-t', '--task', type=str,
@@ -132,7 +132,7 @@ def group(lst, n):
 
 def report(data):
     data = [l.strip() for l in data]
-    data = [l for l in data if l]
+    data = [l for l in data if l and not l.startswith('#')]
 
     L = len(data)
     if (L / 3) != (L // 3):
@@ -141,35 +141,57 @@ def report(data):
         data = data[:L - (L % 3)]
 
     today = datetime.datetime.today().date()
+    delta = datetime.timedelta(minutes=TASK_DURATION)
 
     pomos = collections.OrderedDict()
     total_today = datetime.timedelta()
     for (task, start, end) in group(data, 3):
         start = load_time(start)
         end = load_time(end)
+        key = (task, end.date())
         
-        if task not in pomos:
-            pomos[task] = {'nr': 0,
-                           'time': datetime.timedelta(),
-                           'date': end.date()}
+        if key not in pomos:
+            pomos[key] = {'nr': 0,
+                          'time': datetime.timedelta()}
 
-        pomos[task]['nr'] += 1
-        delta = (end - start)
-        pomos[task]['time'] += delta
+        pomos[key]['nr'] += 1
+        pomos[key]['time'] += delta
 
         if end.date() == today:
             total_today += delta
 
-    print "Task summary [pomos]"
-    print "--------------------"
-    for task in pomos:
-        print '%s [%d]' % (task, pomos[task]['nr'])
-    print
+
+    # Combine tasks from different days
+    join_tasks = collections.OrderedDict()
+    for p in pomos:
+        name, enddate = p
+        if name not in join_tasks:
+            join_tasks[name] = copy.copy(pomos[p])
+        else:
+            join_tasks[name]['nr'] += pomos[p]['nr']
+            join_tasks[name]['time'] += pomos[p]['time']
+
+    all_tasks = [(task, join_tasks[task]['nr']) for task in join_tasks]
+    today_tasks = [(task, pomos[(task, end)]['nr']) for (task, end) in pomos \
+                   if end == today]
+
+    def print_tasks(tasks, header=''):
+        total = sum(nr for (task, nr) in tasks)
+        header = "%s [%d pomos]" % (header, total)
+
+        print header
+        print "-" * len(header)
+        for task in tasks:
+            print '%s [%d]' % task
+        print
+
+    print_tasks(all_tasks, "Summary: all tasks")
+    print_tasks(today_tasks, "Summary: today's tasks")
 
     total = datetime.timedelta()
     longest_time = datetime.timedelta()
     longest_name = 'No task longer than 0 minutes'
-    for name, task in pomos.items():
+    for (name, task) in join_tasks.items():
         duration = task['time']
         total += task['time']
 
@@ -180,12 +202,12 @@ def report(data):
     print "Last 5 days"
     print "-----------"
     day_work = {}
-    for name, task in pomos.items():
-        days_ago = (today - task['date']).days
+    for (name, enddate), task in pomos.items():
+        days_ago = (today - enddate).days
         if days_ago <= 5:
-            day_work[days_ago] = day_work.get(days_ago, 0) + 1
+            day_work[days_ago] = day_work.get(days_ago, 0) + task['nr']
 
-    for i in range(5, 0, -1):
+    for i in range(5, -1, -1):
         if i in day_work:
             print today - datetime.timedelta(days=i), "[%s]" % day_work[i]
         
