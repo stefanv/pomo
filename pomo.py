@@ -4,11 +4,13 @@
 # License: BSD
 
 from __future__ import division
-
-TASK_DURATION = 25
-
 import argparse, time, os, warnings, itertools, collections, \
        datetime, sys, threading, multiprocessing, Queue, copy
+
+TASK_DURATION = 25
+SOUND_DONE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), './sounds/pop.ogg')
+    )
 
 parser = argparse.ArgumentParser(description='Pomodoro timer')
 parser.add_argument('-t', '--task', type=str,
@@ -24,30 +26,54 @@ if args.task is None and args.analyse is None:
     
 
 try:
+    print 'Checking for pynotify...',
     import pynotify
     has_pynotify = True
+    print 'found.'
 except ImportError:
     has_pynotify = False
+    print 'not found.'
 
 try:
+    print 'Checking for appindicator...',
     import appindicator
     has_appindicator = True
+    print 'found.'
+    
     app_type = appindicator.CATEGORY_APPLICATION_STATUS
     app_status_active = appindicator.STATUS_ACTIVE
     app_status_attention = appindicator.STATUS_ATTENTION
 except ImportError:
+    print 'not found.'
     has_appindicator = False
     app_type = None
     app_status_active = 1
     app_status_attention = 2
 
 try:
+    print 'Checking for gtk...',
     import gtk
     import gobject
     has_gtk = True
-except:
-    has_gtk = False
 
+    gobject.threads_init()
+    print 'found.'
+except ImportError:
+    has_gtk = False
+    print 'not found.'
+
+has_gst = False
+if has_gtk:
+    print 'Checking for gstreamer...',
+    try:
+        import pygst
+        pygst.require('0.10')
+        import gst
+        has_gst = True
+        print 'found.'
+    except:
+        pass
+        print 'not found.'
 
 if has_gtk:
     class GTKIndicator(object):
@@ -82,6 +108,60 @@ if has_appindicator and has_gtk:
 elif has_gtk:
     Indicator = GTKIndicator
 
+
+class AudioPlayer(object):
+    def __call__(self, filename):
+        pass
+
+if has_gst:
+    class GSTPlayer(AudioPlayer):
+        """Play audio using gstreamer.
+
+        Handy references:
+
+        http://www.jejik.com/articles/2007/01/python-gstreamer_threading_and_the_main_loop/
+        http://www.majorsilence.com/pygtk_audio_and_video_playback_gstreamer
+
+        """
+        playing = True
+        pipeline = None
+
+        def __init__(self):
+            AudioPlayer.__init__(self)
+            loop = gobject.MainLoop()
+            gobject.threads_init()
+            self.context = loop.get_context()
+
+        def __call__(self, filename):
+            self.playing = True
+            gst_command = ('filesrc location=%s ! decodebin !'
+                           'audioconvert ! autoaudiosink') % filename
+            pipeline = gst.parse_launch(gst_command)
+            bus = pipeline.get_bus()
+            bus.add_signal_watch()
+            bus.connect("message", self.message)
+            pipeline.set_state(gst.STATE_PLAYING)
+            self.pipeline = pipeline
+
+            while self.playing:
+                self.context.iteration(True)
+                time.sleep(1e-3)
+
+        def message(self, bus, message):
+            if message.type == gst.MESSAGE_EOS:
+                self.done()
+            elif message.type == gst.MESSAGE_ERROR:
+                (err, debug) = message.parse_error()
+                print "Error while playing audio: %s" % err
+
+        def done(self):
+            self.playing = False
+            self.pipeline.set_state(gst.STATE_NULL)
+
+    player = GSTPlayer()
+else:
+    player = AudioPlayer()
+
 def notify(title, message, sound=False):
     global has_pynotify
 
@@ -102,11 +182,7 @@ def notify(title, message, sound=False):
         print "*" * 50 + "\n\n"
 
     if sound:
-        import subprocess
-        try:
-            subprocess.call(['/usr/bin/canberra-gtk-play', '--id', 'message'])
-        except OSError:
-            pass
+        player(SOUND_DONE)
 
 def get_time():
     return time.strftime('%Y/%m/%d %H:%M:%S')
