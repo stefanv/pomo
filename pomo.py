@@ -56,7 +56,6 @@ try:
     import gobject
     has_gtk = True
 
-    gobject.threads_init()
     print 'found.'
 except ImportError:
     has_gtk = False
@@ -331,7 +330,12 @@ class PomoApplet(TimeConsumer):
         self.task = task
         self.time = '00:00'
         self._pause = False
+        self._running = True
 
+        loop = gobject.MainLoop()
+        gobject.threads_init()
+        self.context = loop.get_context()
+   
     def run(self):
         ind = Indicator("pomo", "pomo-applet-active", app_type)
         ind.set_status(app_status_active)
@@ -363,25 +367,27 @@ class PomoApplet(TimeConsumer):
 
         self.update_label()
 
-        gobject.timeout_add(1000, self.timeout_callback)
+        while self._running:
+            self.do_work_unit()
+            self.flush_events()
 
-        gtk.main()
-
-    def timeout_callback(self,):
+    def do_work_unit(self,):
         if self._pause:
-            return True
+            return
 
-        task = self.time_queue.get()
+        task = self.time_queue.get(timeout=1)
         if task is None:
             self.abort()
             return
+        else:
+            time.sleep(1)
 
         self.time = task
         self.update_label()
-        return True
 
     def update_label(self):
         self._time_menu.set_label(self.time)
+        self.flush_events()
 
     def squish(self, menu=None):
         self.msg_queue.put('ABORT')
@@ -391,7 +397,13 @@ class PomoApplet(TimeConsumer):
         self._pause = not self._pause
 
     def abort(self):
-        gtk.main_quit()
+        self._running = False
+
+    def flush_events(self):
+        while self.context.pending():
+            self.context.iteration(True)
+            time.sleep(0.01)
+
 
 if __name__ == "__main__":
 
