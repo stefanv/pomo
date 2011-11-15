@@ -391,63 +391,64 @@ class PomoApplet(TimeConsumer):
     def abort(self):
         gtk.main_quit()
 
+if __name__ == "__main__":
 
-time_queue = multiprocessing.Queue()
-msg_queue = multiprocessing.Queue()
+    time_queue = multiprocessing.Queue()
+    msg_queue = multiprocessing.Queue()
 
-for i in range(int(TASK_DURATION * 60) - 1, -1, -1):
-     time_queue.put(str(datetime.timedelta(seconds=i)))
+    for i in range(int(TASK_DURATION * 60) - 1, -1, -1):
+         time_queue.put(str(datetime.timedelta(seconds=i)))
 
-if has_gtk:
-    applet_process = PomoApplet(time_queue, msg_queue, args.task)
-    applet_process.start()
-else:
-    applet_process = TimeConsumer(time_queue, msg_queue)
-    applet_process.start()
+    if has_gtk:
+        applet_process = PomoApplet(time_queue, msg_queue, args.task)
+        applet_process.start()
+    else:
+        applet_process = TimeConsumer(time_queue, msg_queue)
+        applet_process.start()
 
-def terminate():
-    if applet_process is not None:
-        applet_process.terminate()
-        sys.exit(0)
+    def terminate():
+        if applet_process is not None:
+            applet_process.terminate()
+            sys.exit(0)
 
-notify('Your 25 minutes starts now',
-       'Working on: %s' % args.task)
+    notify('Your 25 minutes starts now',
+           'Working on: %s' % args.task)
 
-time0 = get_time()
+    time0 = get_time()
 
-while applet_process.is_alive() or not msg_queue.empty():
-    try:
-        msg = msg_queue.get_nowait()
-    except Queue.Empty:
-        time.sleep(0.1)
-        msg = None
+    while applet_process.is_alive() or not msg_queue.empty():
+        try:
+            msg = msg_queue.get_nowait()
+        except Queue.Empty:
+            time.sleep(0.1)
+            msg = None
 
-    if msg == 'ABORT':
-        notify("Squish!",
-               'Tomato recycled...')
-        terminate()
-    
+        if msg == 'ABORT':
+            notify("Squish!",
+                   'Tomato recycled...')
+            terminate()
 
-time1 = get_time()
 
-notify("Time's up!",
-       'Take a 5 minute break...',
-       sound=True)
+    time1 = get_time()
 
-if time_queue.empty():
-    log_file = os.path.join(os.path.dirname(__file__), 'pomo.log')
+    notify("Time's up!",
+           'Take a 5 minute break...',
+           sound=True)
 
-    try:
-        with open(log_file, 'a') as f:
-            f.writelines(l + "\n" for l in
-                         (args.task or "Pomodoro",
-                          time0,
-                          time1,
-                          ""))
-    except IOError:
-        print 'Could not write to log file %s.' % log_file
+    if time_queue.empty():
+        log_file = os.path.join(os.path.dirname(__file__), './pomo.log')
 
-else:
-    print "Pomodoro incomplete... not writing to log."
+        try:
+            with open(log_file, 'a') as f:
+                f.writelines(l + "\n" for l in
+                             (args.task or "Pomodoro",
+                              time0,
+                              time1,
+                              ""))
+        except IOError:
+            print 'Could not write to log file %s.' % log_file
 
-terminate()
+    else:
+        print "Pomodoro incomplete... not writing to log."
+
+    terminate()
