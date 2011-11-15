@@ -371,10 +371,12 @@ class PomoApplet(TimeConsumer):
         if self._pause:
             return True
 
-        self.time = self.time_queue.get()
-        if self.time is None:
+        task = self.time_queue.get()
+        if task is None:
             self.abort()
+            return
 
+        self.time = task
         self.update_label()
         return True
 
