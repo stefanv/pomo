@@ -411,31 +411,20 @@ class PomoApplet(TimeConsumer):
             time.sleep(0.01)
 
 
-if __name__ == "__main__":
-
-    time_queue = multiprocessing.Queue()
-    msg_queue = multiprocessing.Queue()
-
-    for i in range(int(TASK_DURATION * 60) - 1, -1, -1):
-         time_queue.put(str(datetime.timedelta(seconds=i)))
-
-    # Add end-of-queue sentinel
-    time_queue.put(None)
-
+def launch_and_monitor(time_queue, msg_queue, task_name='', start_msg=None):
     if has_gtk:
-        applet_process = PomoApplet(time_queue, msg_queue, args.task)
+        applet_process = PomoApplet(time_queue, msg_queue, task_name)
         applet_process.start()
     else:
         applet_process = TimeConsumer(time_queue, msg_queue)
         applet_process.start()
 
-    def terminate():
-        if applet_process is not None:
-            applet_process.terminate()
-            sys.exit(0)
+    # This has to be done after the GTK context has been created.
+    # For some reason notify hijacks the GTK main loop, so
+    # we can't use launch_and_monitor again after notifying.
 
-    notify('Your 25 minutes starts now',
-           'Working on: %s' % args.task)
+    if start_msg is not None:
+        notify(*start_msg)
 
     time0 = get_time()
 
@@ -449,14 +438,32 @@ if __name__ == "__main__":
         if msg == 'ABORT':
             notify("Squish!",
                    'Tomato recycled...')
-            terminate()
-
+            applet_process.terminate()
 
     time1 = get_time()
 
-    notify("Time's up!",
-           'Take a 5 minute break...',
-           sound=True)
+    return applet_process, time0, time1
+
+
+if __name__ == "__main__":
+
+    time_queue = multiprocessing.Queue()
+    msg_queue = multiprocessing.Queue()
+
+    for i in range(int(TASK_DURATION * 60) - 1, -1, -1):
+         time_queue.put(str(datetime.timedelta(seconds=i)))
+
+    # Add end-of-queue sentinel
+    time_queue.put(None)
+
+    start_msg = ('Your 25 minutes starts now',
+                 'Working on: %s' % args.task)
+
+    applet_process, time0, time1 = launch_and_monitor(time_queue, msg_queue,
+                                                      task_name=args.task,
+                                                      start_msg=start_msg)
+
+    notify("Time's up!", 'Take a 5 minute break...', sound=True)
 
     if time_queue.empty():
         log_file = os.path.join(os.path.dirname(__file__), './pomo.log')
@@ -473,5 +480,3 @@ if __name__ == "__main__":
 
     else:
         print "Pomodoro incomplete... not writing to log."
-
-    terminate()
