@@ -314,13 +314,14 @@ class TimeConsumer(multiprocessing.Process):
 
     def run(self):
         while 1:
-            try:
-                task = self.time_queue.get_nowait()
-                sys.stdout.write('Time left: ' + task + '\r')
-                sys.stdout.flush()
-                time.sleep(1)
-            except Queue.Empty:
+            task = self.time_queue.get()
+            if task is None:
                 break
+
+            sys.stdout.write('Time left: ' + task + '\r')
+            sys.stdout.flush()
+            time.sleep(1)
+
         print
 
 
@@ -370,9 +371,8 @@ class PomoApplet(TimeConsumer):
         if self._pause:
             return True
 
-        try:
-            self.time = self.time_queue.get_nowait()
-        except Queue.Empty:
+        self.time = self.time_queue.get()
+        if self.time is None:
             self.abort()
 
         self.update_label()
@@ -398,6 +398,9 @@ if __name__ == "__main__":
 
     for i in range(int(TASK_DURATION * 60) - 1, -1, -1):
          time_queue.put(str(datetime.timedelta(seconds=i)))
+
+    # Add end-of-queue sentinel
+    time_queue.put(None)
 
     if has_gtk:
         applet_process = PomoApplet(time_queue, msg_queue, args.task)
