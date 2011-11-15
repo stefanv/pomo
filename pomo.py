@@ -368,13 +368,19 @@ class PomoApplet(TimeConsumer):
         self.update_label()
 
         while self._running:
-            self.do_work_unit()
+            # Call GTK event loop
             self.flush_events()
 
-    def do_work_unit(self,):
-        if self._pause:
-            return
+            # Sleep shorter when in pause state, so that
+            # counter will continue immediately when unpaused
+            if self._pause:
+                time.sleep(0.1)
+                continue
 
+            # Otherwise, consume a second-long job
+            self.do_work_unit()
+
+    def do_work_unit(self,):
         task = self.time_queue.get(timeout=1)
         if task is None:
             self.abort()
