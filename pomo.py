@@ -23,7 +23,7 @@ if args.task is None and args.analyse is None:
     parser.print_help()
     print "\nEither specify a task, or analyse a log file."
     sys.exit(-1)
-    
+
 
 try:
     print 'Checking for pynotify...',
@@ -39,7 +39,7 @@ try:
     import appindicator
     has_appindicator = True
     print 'found.'
-    
+
     app_type = appindicator.CATEGORY_APPLICATION_STATUS
     app_status_active = appindicator.STATUS_ACTIVE
     app_status_attention = appindicator.STATUS_ATTENTION
@@ -224,7 +224,7 @@ def report(data):
         start = load_time(start)
         end = load_time(end)
         key = (task, end.date())
-        
+
         if key not in pomos:
             pomos[key] = {'nr': 0,
                           'time': datetime.timedelta()}
@@ -285,7 +285,7 @@ def report(data):
     for i in range(5, -1, -1):
         if i in day_work:
             print today - datetime.timedelta(days=i), "[%s]" % day_work[i]
-        
+
 
     print "\nTime summary"
     print "------------"
@@ -335,7 +335,7 @@ class PomoApplet(TimeConsumer):
         loop = gobject.MainLoop()
         gobject.threads_init()
         self.context = loop.get_context()
-   
+
     def run(self):
         ind = Indicator("pomo", "pomo-applet-active", app_type)
         ind.set_status(app_status_active)
