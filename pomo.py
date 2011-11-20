@@ -463,9 +463,9 @@ if __name__ == "__main__":
                                                       task_name=args.task,
                                                       start_msg=start_msg)
 
-    notify("Time's up!", 'Take a 5 minute break...', sound=True)
-
     if time_queue.empty():
+        notify("Time's up!", 'Take a 5 minute break...', sound=True)
+
         log_file = os.path.join(os.path.dirname(__file__), './pomo.log')
 
         try:
