@@ -386,7 +386,11 @@ class PomoApplet(TimeConsumer):
             self.abort()
             return
         else:
-            time.sleep(1)
+            # Interrupt timer a number of times
+            # to check for GTK events
+            for i in range(20):
+                time.sleep(1./20)
+                self.flush_events()
 
         self.time = task
         self.update_label()
