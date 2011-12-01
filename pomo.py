@@ -171,7 +171,9 @@ def notify(title, message, sound=False):
         n = pynotify.Notification(title, message)
         n.set_urgency(pynotify.URGENCY_CRITICAL)
 
-        if not n.show():
+        try:
+            n.show()
+        except:
             has_pynotify = False
 
     if not has_pynotify:
