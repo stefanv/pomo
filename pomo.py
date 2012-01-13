@@ -74,6 +74,8 @@ if has_gtk:
         pass
         print 'not found.'
 
+print
+
 if has_gtk:
     class GTKIndicator(object):
         """Inspired by
@@ -381,6 +383,10 @@ class PomoApplet(TimeConsumer):
 
             # Otherwise, consume a second-long job
             self.do_work_unit()
+
+            sys.stdout.write('Time left: ' + self.time + '\r')
+            sys.stdout.flush()
+
 
     def do_work_unit(self,):
         task = self.time_queue.get(timeout=1)
